@@ -6,7 +6,8 @@ This is a Minimum Viable Product (MVP) built to automate the process of gatherin
 ## The 'Mentor' Approach
 This project follows a "modular" approach to coding, which is a key best practice. Instead of putting everything in one big file, we split the code into separate, organized files:
 *   **`processor.py`**: This file handles specific tasks like reading the data.
-*   **`app.py`**: This is the main entry point that runs the application.
+*   **`app.py`**: This is the main entry point that runs the application in the terminal.
+*   **`main.py`**: This runs the Web API server using FastAPI.
 *   **`requirements.txt`**: Keeps track of all the external tools we are using.
 
 This keeps the project clean, organized, and easier to manage as it grows.
@@ -24,3 +25,13 @@ To run the application and see your transaction data, type the following into yo
 ```bash
 python app.py
 ```
+
+### Web API
+To run the web server and access the data as JSON:
+
+1.  Run the server:
+    ```bash
+    python -m uvicorn main:app --reload
+    ```
+2.  Open your browser to: `http://127.0.0.1:8000/transactions`
+
