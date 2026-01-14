@@ -9,6 +9,7 @@ This project follows a "modular" approach to coding, which is a key best practic
 *   **`app.py`**: This is the main entry point that runs the application in the terminal.
 *   **`main.py`**: This runs the Web API server using FastAPI.
 *   **`requirements.txt`**: Keeps track of all the external tools we are using.
+*   **`reporter.py`**: Generates styled Excel reports.
 
 This keeps the project clean, organized, and easier to manage as it grows.
 
@@ -16,7 +17,7 @@ This keeps the project clean, organized, and easier to manage as it grows.
 To get started, you need to install a few tools. Open your terminal or command prompt and run:
 
 ```bash
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
 ## Usage
@@ -26,12 +27,18 @@ To run the application and see your transaction data, type the following into yo
 python app.py
 ```
 
-### Web API
-To run the web server and access the data as JSON:
+### Web UI (Browser)
+To use the modern web interface for uploading files and generating reports:
 
 1.  Run the server:
     ```bash
     python -m uvicorn main:app --reload
     ```
-2.  Open your browser to: `http://127.0.0.1:8000/transactions`
+2.  Open your browser (Chrome/Edge) to: `http://127.0.0.1:8000`
+3.  **Upload**: Click "Choose File" and select your transactions CSV.
+4.  **Process**: Click "Upload & Process".
+5.  **Download**: Click the "Download Report" button to get your styled Excel file.
 
+### REST API
+You can also access the raw JSON data directly:
+*   `GET /transactions`: Triggers manual report generation from default file.
