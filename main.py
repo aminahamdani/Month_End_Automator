@@ -1,5 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from processor import load_data
+from errors import AppError, DataNotFoundError, ProcessingError
 import os
 
 app = FastAPI()
@@ -12,10 +13,13 @@ def get_transactions():
     # Ensure we look for the file in the current directory
     file_path = os.path.join(os.getcwd(), 'january_transactions.csv')
     
-    df = load_data(file_path)
-    
-    if df is not None:
+    try:
+        df = load_data(file_path)
         # Convert DataFrame to a list of dictionaries (JSON records)
         return df.to_dict(orient='records')
-    else:
-        return {"error": "Could not load data. Check if 'january_transactions.csv' exists."}
+    except DataNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ProcessingError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except AppError as e:
+        raise HTTPException(status_code=500, detail=f"Application Error: {str(e)}")
