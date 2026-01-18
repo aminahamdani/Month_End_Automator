@@ -1,0 +1,22 @@
+Date,Description,Category,Amount,Account,Reference
+2026-01-01,Office Supplies Purchase,Expenses,-125.50,Checking,REF-001
+2026-01-03,Client Payment Received,Revenue,2500.00,Checking,REF-002
+2026-01-05,Software Subscription,Expenses,-49.99,Checking,REF-003
+2026-01-07,Consulting Services,Revenue,1500.00,Checking,REF-004
+2026-01-10,Utility Bill - Electricity,Expenses,-89.25,Checking,REF-005
+2026-01-12,Marketing Campaign,Expenses,-350.00,Checking,REF-006
+2026-01-15,Client Payment Received,Revenue,3200.00,Checking,REF-007
+2026-01-18,Office Rent,Expenses,-1200.00,Checking,REF-008
+2026-01-20,Professional Services,Revenue,1800.00,Checking,REF-009
+2026-01-22,Internet Service,Expenses,-79.99,Checking,REF-010
+2026-01-25,Client Payment Received,Revenue,2750.00,Checking,REF-011
+2026-01-28,Equipment Purchase,Expenses,-850.00,Checking,REF-012
+2026-02-02,Client Payment Received,Revenue,2100.00,Checking,REF-013
+2026-02-05,Office Supplies Purchase,Expenses,-95.75,Checking,REF-014
+2026-02-08,Training Course,Expenses,-299.00,Checking,REF-015
+2026-02-10,Client Payment Received,Revenue,1890.00,Checking,REF-016
+2026-02-12,Insurance Premium,Expenses,-450.00,Checking,REF-017
+2026-02-15,Consulting Services,Revenue,1650.00,Checking,REF-018
+2026-02-18,Marketing Campaign,Expenses,-425.00,Checking,REF-019
+2026-02-20,Client Payment Received,Revenue,3100.00,Checking,REF-020
+2026-02-25,Software License Renewal,Expenses,-199.99,Checking,REF-021

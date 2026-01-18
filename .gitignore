@@ -7,3 +7,11 @@ env/
 venv/
 .idea/
 .vscode/
+
+# Generated files
+*.xlsx
+uploaded_transactions*.csv
+Month_End_Report_*.xlsx
+temp_preview_*.csv
+export_*.csv
+export_*.xlsx
