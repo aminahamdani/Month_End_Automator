@@ -15,3 +15,17 @@ Month_End_Report_*.xlsx
 temp_preview_*.csv
 export_*.csv
 export_*.xlsx
+
+# Azure and deployment files
+.azure/
+*.backup
+*.bak
+startup_command.txt
+
+# Test files
+test_*.py
+*_test.py
+
+# Data directories
+data/uploads/
+data/
