@@ -1,9 +1,15 @@
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, Depends
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles # Optional if we had static css files, but keeping provided structure
+from starlette.middleware.sessions import SessionMiddleware
 from processor import load_data
 from errors import AppError, DataNotFoundError, ProcessingError
+from services.company_service import (
+    initialize_default_data, authenticate_user as company_authenticate_user,
+    get_user as get_company_user, get_user_company, create_user as create_company_user
+)
+from services.audit_log import log_action, get_user_activity
 import reporter
 import shutil
 import os
@@ -11,18 +17,128 @@ import logging
 import pandas as pd
 from typing import Optional
 from datetime import datetime
+from pathlib import Path
+import secrets
 
 app = FastAPI()
+app.add_middleware(SessionMiddleware, secret_key=secrets.token_urlsafe(32))
 
 # Setup templates
 templates = Jinja2Templates(directory="templates")
 
+# Initialize company service and migrate existing users to default company
+initialize_default_data()
+
+# Migrate existing hardcoded users to the company service
+_existing_users = {
+    "amina": "amina0000"
+}
+for username, password in _existing_users.items():
+    try:
+        create_company_user(username, password)  # Will default to default company
+    except:
+        pass  # User might already exist
+
+def get_current_user(request: Request):
+    """Check if user is authenticated"""
+    return request.session.get("username")
+
+def require_auth(request: Request):
+    """Dependency to require authentication"""
+    username = get_current_user(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return username
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    """Redirect to login or dashboard based on auth status"""
+    username = get_current_user(request)
+    if username:
+        return RedirectResponse(url="/dashboard", status_code=302)
+    return RedirectResponse(url="/login", status_code=302)
 
-@app.post("/upload", response_class=HTMLResponse)
-async def upload_file(request: Request, file: UploadFile = File(...)):
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request, error: Optional[str] = None):
+    """Display login page"""
+    username = get_current_user(request)
+    if username:
+        return RedirectResponse(url="/dashboard", status_code=302)
+    return templates.TemplateResponse("login.html", {"request": request, "error": error})
+
+@app.post("/login", response_class=HTMLResponse)
+async def login(request: Request, username: str = Form(...), password: str = Form(...)):
+    """Handle login"""
+    user = company_authenticate_user(username, password)
+    if user:
+        request.session["username"] = username
+        request.session["company_id"] = user.get("company_id")
+        log_action(username, "user_login", {"username": username})
+        return RedirectResponse(url="/dashboard", status_code=302)
+    else:
+        return templates.TemplateResponse("login.html", {
+            "request": request,
+            "error": "Invalid username or password"
+        })
+
+@app.get("/logout")
+async def logout(request: Request):
+    """Handle logout"""
+    username = get_current_user(request)
+    if username:
+        log_action(username, "user_logout", {"username": username})
+    request.session.clear()
+    return RedirectResponse(url="/login", status_code=302)
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request):
+    """Display dashboard - requires authentication"""
+    username = require_auth(request)
+    
+    # Get user info
+    user = get_company_user(username)
+    company = get_user_company(username) if user else None
+    
+    # Get recent activity
+    recent_activity = get_user_activity(username, limit=10)
+    
+    # Get recent files (simplified - in production, use database)
+    recent_files = []
+    try:
+        files = [f for f in os.listdir(os.getcwd()) if f.endswith(('.xlsx', '.xls')) and f.startswith('Month_End_Report_')]
+        files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+        for f in files[:5]:
+            recent_files.append({
+                "name": f,
+                "date": datetime.fromtimestamp(os.path.getmtime(f)).strftime("%Y-%m-%d %H:%M:%S")
+            })
+    except:
+        pass
+    
+    # Get stats (simplified - in production, use database)
+    stats = {
+        "total_transactions": 0,
+        "total_amount": 0.0,
+        "reports_generated": len(recent_files),
+        "files_processed": len(recent_files),
+        "last_file_processed_at": recent_files[0]["date"] if recent_files else None,
+        "last_report_generated_at": recent_files[0]["date"] if recent_files else None
+    }
+    
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request,
+        "username": username,
+        "stats": stats,
+        "recent_files": recent_files,
+        "recent_activity": recent_activity,
+        "validation_issues": []  # Would come from database in production
+    })
+
+@app.post("/api/upload")
+async def api_upload(request: Request, file: UploadFile = File(...)):
+    """API endpoint for file upload - requires authentication"""
+    username = require_auth(request)
+    
     # Generate timestamp-based filenames for better organization
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     file_ext = os.path.splitext(file.filename)[1] or '.csv'
@@ -30,52 +146,61 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
     report_filename = f"Month_End_Report_{timestamp}.xlsx"
     
     try:
+        # Ensure uploads directory exists
+        uploads_dir = Path("data/uploads")
+        uploads_dir.mkdir(parents=True, exist_ok=True)
+        
         # Save the uploaded file
-        with open(uploaded_filename, "wb") as buffer:
+        upload_path = uploads_dir / uploaded_filename
+        with open(upload_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
             
         # Process the data
-        # Ensure we use absolute path for safety
-        file_path = os.path.join(os.getcwd(), uploaded_filename)
-        df = load_data(file_path)
+        df = load_data(str(upload_path))
         
         # Generate the report
-        reporter.create_excel_report(df, report_filename)
+        report_path = uploads_dir / report_filename
+        reporter.create_excel_report(df, str(report_path))
         
-        # Return success page with download link
-        return templates.TemplateResponse("index.html", {
-            "request": request,
-            "download_link": f"/download/{report_filename}"
+        # Log the action
+        log_action(username, "file_upload", {
+            "filename": uploaded_filename,
+            "report_filename": report_filename,
+            "rows_processed": len(df)
+        })
+        
+        return JSONResponse(content={
+            "status": "success",
+            "filename": report_filename,
+            "uploaded_at": datetime.now().isoformat(),
+            "rows_processed": len(df)
         })
 
     except DataNotFoundError as e:
-        return templates.TemplateResponse("index.html", {
-            "request": request,
-            "error": f"File not found: {str(e)}. Please ensure the file was uploaded correctly."
-        })
+        raise HTTPException(status_code=404, detail=f"File not found: {str(e)}")
     except ProcessingError as e:
-        return templates.TemplateResponse("index.html", {
-            "request": request,
-            "error": f"Processing error: {str(e)}. Please check your CSV file format and ensure it contains an 'Amount' column."
-        })
+        raise HTTPException(status_code=400, detail=f"Processing error: {str(e)}")
     except AppError as e:
-        return templates.TemplateResponse("index.html", {
-            "request": request,
-            "error": f"Application error: {str(e)}. Please try again or contact support if the issue persists."
-        })
+        raise HTTPException(status_code=500, detail=f"Application error: {str(e)}")
     except Exception as e:
         error_message = f"An unexpected error occurred: {str(e)}"
-        logging.error(f"Unhandled exception in upload_file: {e}", exc_info=True)
-        return templates.TemplateResponse("index.html", {
-            "request": request,
-            "error": error_message
-        })
+        logging.error(f"Unhandled exception in api_upload: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=error_message)
 
 @app.get("/download/{filename}")
-async def download_file(filename: str):
-    file_path = os.path.join(os.getcwd(), filename)
-    if os.path.exists(file_path):
-        return FileResponse(file_path, filename=filename)
+async def download_file(request: Request, filename: str):
+    """Download a file - requires authentication"""
+    username = require_auth(request)
+    
+    # Check in uploads directory first, then current directory
+    uploads_dir = Path("data/uploads")
+    file_path = uploads_dir / filename
+    if not file_path.exists():
+        file_path = Path(filename)
+    
+    if file_path.exists():
+        log_action(username, "file_download", {"filename": filename})
+        return FileResponse(str(file_path), filename=filename)
     raise HTTPException(status_code=404, detail="File not found")
 
 
