@@ -217,6 +217,14 @@
             color: #155724;
             border: 1px solid #c3e6cb;
         }
+        .alert-success a {
+            color: #155724;
+            text-decoration: underline;
+            font-weight: bold;
+        }
+        .alert-success a:hover {
+            color: #0c4128;
+        }
         .alert-error {
             background-color: #f8d7da;
             color: #721c24;
@@ -573,14 +581,21 @@
                     const data = await response.json();
                     
                     if (response.ok) {
-                        // Success - show success message with filename and time
+                        // Success - show success message with download link
                         const uploadedAt = new Date(data.uploaded_at).toLocaleString();
-                        const successMessage = `✅ File uploaded successfully!\nFilename: ${data.filename}\nUploaded at: ${uploadedAt}`;
-                        showAlert(successMessage, 'alert-success');
+                        const downloadUrl = `/download/${data.filename}`;
+                        const successMessage = `✅ File uploaded successfully! Filename: ${data.filename} | Uploaded at: ${uploadedAt} | <a href="${downloadUrl}" style="color: #155724; text-decoration: underline; font-weight: bold;">Download Report</a>`;
+                        uploadAlert.innerHTML = successMessage;
+                        uploadAlert.className = 'alert alert-success show';
                         
                         // Reset form
                         uploadForm.reset();
                         fileInfo.textContent = 'No file selected';
+                        
+                        // Reload page after 2 seconds to show new report in Recent Reports section
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 2000);
                     } else {
                         // Error - show error message
                         const errorMessage = data.detail || 'An error occurred while uploading the file';

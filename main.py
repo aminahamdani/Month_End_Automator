@@ -105,14 +105,18 @@ async def dashboard(request: Request):
     # Get recent files (simplified - in production, use database)
     recent_files = []
     try:
-        files = [f for f in os.listdir(os.getcwd()) if f.endswith(('.xlsx', '.xls')) and f.startswith('Month_End_Report_')]
-        files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
-        for f in files[:5]:
-            recent_files.append({
-                "name": f,
-                "date": datetime.fromtimestamp(os.path.getmtime(f)).strftime("%Y-%m-%d %H:%M:%S")
-            })
-    except:
+        uploads_dir = Path("data/uploads")
+        if uploads_dir.exists():
+            files = [f for f in os.listdir(uploads_dir) if f.endswith(('.xlsx', '.xls')) and f.startswith('Month_End_Report_')]
+            files_with_paths = [(uploads_dir / f, f) for f in files]
+            files_with_paths.sort(key=lambda x: os.path.getmtime(x[0]), reverse=True)
+            for file_path, filename in files_with_paths[:5]:
+                recent_files.append({
+                    "name": filename,
+                    "date": datetime.fromtimestamp(os.path.getmtime(file_path)).strftime("%Y-%m-%d %H:%M:%S")
+                })
+    except Exception as e:
+        logging.error(f"Error getting recent files: {e}")
         pass
     
     # Get stats (simplified - in production, use database)
