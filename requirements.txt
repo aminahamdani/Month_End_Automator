@@ -3,5 +3,7 @@ openpyxl
 python-dateutil
 fastapi
 uvicorn
+gunicorn
 jinja2
 python-multipart
+itsdangerous
