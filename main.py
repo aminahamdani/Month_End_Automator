@@ -19,6 +19,8 @@ from typing import Optional
 from datetime import datetime
 from pathlib import Path
 import secrets
+from html import escape
+from urllib.parse import quote
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=secrets.token_urlsafe(32))
@@ -266,6 +268,9 @@ async def view_file(request: Request, filename: str):
         # Convert to HTML table
         html_table = df.to_html(classes='file-view-table', table_id='fileDataTable', escape=False, index=False)
         
+        # Escape filename for safe HTML output
+        safe_filename = escape(filename)
+        
         # Create HTML response with styling
         html_content = f"""
         <!DOCTYPE html>
@@ -273,7 +278,7 @@ async def view_file(request: Request, filename: str):
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>View {filename}</title>
+            <title>View {safe_filename}</title>
             <style>
                 body {{
                     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -385,11 +390,11 @@ async def view_file(request: Request, filename: str):
         <body>
             <div class="header">
                 <div>
-                    <h2>📄 {filename}</h2>
+                    <h2>📄 {safe_filename}</h2>
                     <div class="header-info">Total rows: {len(df)} | Total columns: {len(df.columns)}</div>
                 </div>
                 <div class="actions">
-                    <a href="/download/{filename}" class="btn btn-download">⬇ Download</a>
+                    <a href="/download/{quote(filename, safe='')}" class="btn btn-download">⬇ Download</a>
                     <a href="/dashboard" class="btn btn-back">← Back to Dashboard</a>
                 </div>
             </div>
@@ -404,7 +409,7 @@ async def view_file(request: Request, filename: str):
                 </div>
                 <div class="stat-item">
                     <span class="stat-label">File Type</span>
-                    <span class="stat-value">{'Excel Report' if filename.startswith('Month_End_Report_') else 'CSV Upload'}</span>
+                    <span class="stat-value">{escape('Excel Report' if filename.startswith('Month_End_Report_') else 'CSV Upload')}</span>
                 </div>
             </div>
             <div class="table-container">
