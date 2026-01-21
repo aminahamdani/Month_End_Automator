@@ -102,11 +102,38 @@ async def dashboard(request: Request):
     # Get recent activity
     recent_activity = get_user_activity(username, limit=10)
     
-    # Get recent files (simplified - in production, use database)
+    # Get recent files and calculate statistics from uploaded transaction files
     recent_files = []
+    total_transactions = 0
+    total_amount = 0.0
+    uploaded_files_count = 0
+    
     try:
         uploads_dir = Path("data/uploads")
         if uploads_dir.exists():
+            # Get all uploaded transaction files (CSV/Excel files that were uploaded)
+            uploaded_files = [f for f in os.listdir(uploads_dir) if f.startswith('uploaded_transactions_') and f.endswith(('.csv', '.xlsx', '.xls'))]
+            uploaded_files_count = len(uploaded_files)
+            
+            # Calculate total transactions and amount from all uploaded files
+            for uploaded_file in uploaded_files:
+                try:
+                    file_path = uploads_dir / uploaded_file
+                    df = load_data(str(file_path))
+                    
+                    # Count transactions (rows)
+                    total_transactions += len(df)
+                    
+                    # Sum all amounts
+                    if 'Amount' in df.columns:
+                        amounts = pd.to_numeric(df['Amount'], errors='coerce')
+                        valid_amounts = amounts.dropna()
+                        total_amount += float(valid_amounts.sum())
+                except Exception as e:
+                    logging.error(f"Error processing {uploaded_file} for stats: {e}")
+                    pass
+            
+            # Get recent report files for display
             files = [f for f in os.listdir(uploads_dir) if f.endswith(('.xlsx', '.xls')) and f.startswith('Month_End_Report_')]
             files_with_paths = [(uploads_dir / f, f) for f in files]
             files_with_paths.sort(key=lambda x: os.path.getmtime(x[0]), reverse=True)
@@ -116,15 +143,15 @@ async def dashboard(request: Request):
                     "date": datetime.fromtimestamp(os.path.getmtime(file_path)).strftime("%Y-%m-%d %H:%M:%S")
                 })
     except Exception as e:
-        logging.error(f"Error getting recent files: {e}")
+        logging.error(f"Error getting recent files and stats: {e}")
         pass
     
     # Get stats (simplified - in production, use database)
     stats = {
-        "total_transactions": 0,
-        "total_amount": 0.0,
+        "total_transactions": total_transactions,
+        "total_amount": total_amount,
         "reports_generated": len(recent_files),
-        "files_processed": len(recent_files),
+        "files_processed": uploaded_files_count,
         "last_file_processed_at": recent_files[0]["date"] if recent_files else None,
         "last_report_generated_at": recent_files[0]["date"] if recent_files else None
     }
