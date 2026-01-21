@@ -267,6 +267,38 @@
         .file-link:hover {
             text-decoration: underline;
         }
+        .file-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .btn-view, .btn-download-file {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.3s;
+            display: inline-block;
+        }
+        .btn-view {
+            background-color: #3498db;
+            color: white;
+        }
+        .btn-view:hover {
+            background-color: #2980b9;
+            transform: translateY(-1px);
+        }
+        .btn-download-file {
+            background-color: #27ae60;
+            color: white;
+        }
+        .btn-download-file:hover {
+            background-color: #229954;
+            transform: translateY(-1px);
+        }
         .empty-state {
             text-align: center;
             padding: 40px;
@@ -469,7 +501,10 @@
                             </div>
                             <div class="file-date">{{ file.date }}</div>
                         </div>
-                        <a href="/download/{{ file.name }}" class="file-link">Download</a>
+                        <div class="file-actions">
+                            <a href="/view/{{ file.name }}" class="btn-view" target="_blank">👁️ View</a>
+                            <a href="/download/{{ file.name }}" class="btn-download-file">⬇ Download</a>
+                        </div>
                     </li>
                     {% endfor %}
                 </ul>

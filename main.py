@@ -245,6 +245,183 @@ async def api_upload(request: Request, file: UploadFile = File(...)):
         logging.error(f"Unhandled exception in api_upload: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=error_message)
 
+@app.get("/view/{filename}", response_class=HTMLResponse)
+async def view_file(request: Request, filename: str):
+    """View a file as HTML table - requires authentication"""
+    username = require_auth(request)
+    
+    # Check in uploads directory first, then current directory
+    uploads_dir = Path("data/uploads")
+    file_path = uploads_dir / filename
+    if not file_path.exists():
+        file_path = Path(filename)
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    try:
+        # Load the file
+        df = load_data(str(file_path))
+        
+        # Convert to HTML table
+        html_table = df.to_html(classes='file-view-table', table_id='fileDataTable', escape=False, index=False)
+        
+        # Create HTML response with styling
+        html_content = f"""
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>View {filename}</title>
+            <style>
+                body {{
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    margin: 0;
+                    padding: 20px;
+                    background-color: #f4f6f8;
+                }}
+                .header {{
+                    background: white;
+                    padding: 20px;
+                    border-radius: 8px;
+                    margin-bottom: 20px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }}
+                .header h2 {{
+                    margin: 0;
+                    color: #2c3e50;
+                }}
+                .header-info {{
+                    color: #7f8c8d;
+                    font-size: 14px;
+                }}
+                .actions {{
+                    display: flex;
+                    gap: 10px;
+                }}
+                .btn {{
+                    padding: 10px 20px;
+                    border: none;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    text-decoration: none;
+                    font-size: 14px;
+                    transition: all 0.3s;
+                }}
+                .btn-download {{
+                    background-color: #3498db;
+                    color: white;
+                }}
+                .btn-download:hover {{
+                    background-color: #2980b9;
+                }}
+                .btn-back {{
+                    background-color: #95a5a6;
+                    color: white;
+                }}
+                .btn-back:hover {{
+                    background-color: #7f8c8d;
+                }}
+                .table-container {{
+                    background: white;
+                    padding: 20px;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    overflow-x: auto;
+                }}
+                .file-view-table {{
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 14px;
+                }}
+                .file-view-table th {{
+                    background-color: #1e3a5f;
+                    color: white;
+                    padding: 12px;
+                    text-align: left;
+                    font-weight: 600;
+                    border: 1px solid #ddd;
+                }}
+                .file-view-table td {{
+                    padding: 10px 12px;
+                    border: 1px solid #ddd;
+                }}
+                .file-view-table tr:nth-child(even) {{
+                    background-color: #f8f9fa;
+                }}
+                .file-view-table tr:hover {{
+                    background-color: #e8f4f8;
+                }}
+                .stats {{
+                    background: white;
+                    padding: 15px 20px;
+                    border-radius: 8px;
+                    margin-bottom: 20px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    display: flex;
+                    gap: 30px;
+                    flex-wrap: wrap;
+                }}
+                .stat-item {{
+                    display: flex;
+                    flex-direction: column;
+                }}
+                .stat-label {{
+                    font-size: 12px;
+                    color: #7f8c8d;
+                    margin-bottom: 5px;
+                }}
+                .stat-value {{
+                    font-size: 18px;
+                    font-weight: 600;
+                    color: #2c3e50;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <div>
+                    <h2>📄 {filename}</h2>
+                    <div class="header-info">Total rows: {len(df)} | Total columns: {len(df.columns)}</div>
+                </div>
+                <div class="actions">
+                    <a href="/download/{filename}" class="btn btn-download">⬇ Download</a>
+                    <a href="/dashboard" class="btn btn-back">← Back to Dashboard</a>
+                </div>
+            </div>
+            <div class="stats">
+                <div class="stat-item">
+                    <span class="stat-label">Rows</span>
+                    <span class="stat-value">{len(df)}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Columns</span>
+                    <span class="stat-value">{len(df.columns)}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">File Type</span>
+                    <span class="stat-value">{'Excel Report' if filename.startswith('Month_End_Report_') else 'CSV Upload'}</span>
+                </div>
+            </div>
+            <div class="table-container">
+                {html_table}
+            </div>
+        </body>
+        </html>
+        """
+        
+        log_action(username, "file_view", {"filename": filename})
+        return HTMLResponse(content=html_content)
+        
+    except Exception as e:
+        logging.error(f"Error viewing file {filename}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error viewing file: {str(e)}")
+
+
 @app.get("/download/{filename}")
 async def download_file(request: Request, filename: str):
     """Download a file - requires authentication"""
