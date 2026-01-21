@@ -133,14 +133,38 @@ async def dashboard(request: Request):
                     logging.error(f"Error processing {uploaded_file} for stats: {e}")
                     pass
             
-            # Get recent report files for display
-            files = [f for f in os.listdir(uploads_dir) if f.endswith(('.xlsx', '.xls')) and f.startswith('Month_End_Report_')]
-            files_with_paths = [(uploads_dir / f, f) for f in files]
-            files_with_paths.sort(key=lambda x: os.path.getmtime(x[0]), reverse=True)
-            for file_path, filename in files_with_paths[:5]:
+            # Get recent files for display (both CSV uploads and Excel reports)
+            # Get Excel reports
+            excel_files = [f for f in os.listdir(uploads_dir) if f.endswith(('.xlsx', '.xls')) and f.startswith('Month_End_Report_')]
+            # Get uploaded CSV files
+            csv_files = [f for f in os.listdir(uploads_dir) if f.startswith('uploaded_transactions_') and f.endswith(('.csv', '.xlsx', '.xls'))]
+            
+            # Combine both types and sort by modification time
+            all_files = []
+            for f in excel_files:
+                file_path = uploads_dir / f
+                all_files.append({
+                    "path": file_path,
+                    "name": f,
+                    "type": "report",
+                    "mtime": os.path.getmtime(file_path)
+                })
+            for f in csv_files:
+                file_path = uploads_dir / f
+                all_files.append({
+                    "path": file_path,
+                    "name": f,
+                    "type": "upload",
+                    "mtime": os.path.getmtime(file_path)
+                })
+            
+            # Sort by modification time (most recent first) and take top 10
+            all_files.sort(key=lambda x: x["mtime"], reverse=True)
+            for file_info in all_files[:10]:
                 recent_files.append({
-                    "name": filename,
-                    "date": datetime.fromtimestamp(os.path.getmtime(file_path)).strftime("%Y-%m-%d %H:%M:%S")
+                    "name": file_info["name"],
+                    "type": file_info["type"],  # "report" or "upload"
+                    "date": datetime.fromtimestamp(file_info["mtime"]).strftime("%Y-%m-%d %H:%M:%S")
                 })
     except Exception as e:
         logging.error(f"Error getting recent files and stats: {e}")
@@ -203,8 +227,11 @@ async def api_upload(request: Request, file: UploadFile = File(...)):
         return JSONResponse(content={
             "status": "success",
             "filename": report_filename,
+            "original_filename": uploaded_filename,  # Include original CSV filename
             "uploaded_at": datetime.now().isoformat(),
-            "rows_processed": len(df)
+            "rows_processed": len(df),
+            "download_csv": f"/download/{uploaded_filename}",  # Link to download original CSV
+            "download_report": f"/download/{report_filename}"  # Link to download Excel report
         })
 
     except DataNotFoundError as e:
