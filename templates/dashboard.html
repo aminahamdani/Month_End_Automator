@@ -618,10 +618,26 @@
                     // Make POST request to /api/upload
                     const response = await fetch('/api/upload', {
                         method: 'POST',
-                        body: formData
+                        body: formData,
+                        credentials: 'include'  // Include cookies/session for authentication
                     });
                     
-                    const data = await response.json();
+                    let data;
+                    try {
+                        data = await response.json();
+                    } catch (e) {
+                        // If response is not JSON, handle as text
+                        const text = await response.text();
+                        if (response.status === 401) {
+                            showAlert('❌ Not authenticated. Please refresh the page and login again.', 'alert-error');
+                            setTimeout(() => {
+                                window.location.href = '/login';
+                            }, 2000);
+                            return;
+                        }
+                        showAlert(`❌ Error: ${text}`, 'alert-error');
+                        return;
+                    }
                     
                     if (response.ok) {
                         // Success - show success message with download links for both CSV and Excel
